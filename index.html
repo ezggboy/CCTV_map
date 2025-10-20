@@ -1,84 +1,83 @@
 <!DOCTYPE html>
-<html>
+<html lang="ko">
 <head>
-  <title>CCTV 위치 지도</title>
   <meta charset="utf-8"/>
+  <title>CCTV 위치 지도</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no"/>
-  <!-- Leaflet -->
-  <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css"/>
-  <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
-  <style>
-    #map { height: 100vh; width: 100%; }
 
-    /* 나침반 (클릭 → 북쪽 복귀) */
-    .leaflet-control-north{
-      background: rgba(255,255,255,.9);
-      border: 1px solid #ccc;
-      border-radius: 8px;
-      padding: 6px 8px;
-      box-shadow: 0 2px 8px rgba(0,0,0,.1);
-      text-align:center; user-select:none; cursor:pointer;
+  <!-- MapLibre GL (카카오맵처럼 부드러운 회전/줌/피치) -->
+  <link href="https://unpkg.com/maplibre-gl@3.6.2/dist/maplibre-gl.css" rel="stylesheet"/>
+  <script src="https://unpkg.com/maplibre-gl@3.6.2/dist/maplibre-gl.js"></script>
+
+  <style>
+    html, body, #map { height: 100%; width: 100%; margin: 0; }
+    /* 커스텀 내 위치 버튼(원하시면 빼도 됨. 기본 Geolocate도 함께 제공) */
+    .myloc-btn {
+      position: absolute; left: 10px; top: 110px; z-index: 10;
+      background:#fff; border:1px solid #ccc; border-radius:4px;
+      width:32px; height:32px; display:flex; align-items:center; justify-content:center;
+      box-shadow:0 2px 8px rgba(0,0,0,.12); cursor:pointer; user-select:none;
     }
-    .north-svg{ width:30px; height:30px; display:block; margin:auto; transition:transform .15s linear; }
-    .north-deg{ font-size:11px; color:#222; }
+    .myloc-btn:active { background:#f3f3f3; }
   </style>
 </head>
 <body>
   <div id="map"></div>
+  <div id="myloc" class="myloc-btn" title="내 위치로 이동">📍</div>
 
   <script>
-  // 🔴 내 위치 아이콘
-  const myLocationIcon = L.icon({
-    iconUrl: 'https://maps.google.com/mapfiles/ms/icons/red-dot.png',
-    iconSize: [32, 32],
-    iconAnchor: [16, 32],
-    popupAnchor: [0, -32]
-  });
+    // 1) 스타일: VWorld 래스터(한글 라벨 포함, 회전 시 글자도 함께 회전)
+    const vwStyle = {
+      "version": 8,
+      "sources": {
+        "vworld-base": {
+          "type": "raster",
+          "tiles": ["https://xdworld.vworld.kr/2d/Base/service/{z}/{x}/{y}.png"],
+          "tileSize": 256,
+          "attribution": "© 국토지리정보원 / VWorld"
+        }
+      },
+      "layers": [
+        { "id": "vworld-base", "type": "raster", "source": "vworld-base" }
+      ]
+    };
 
-  // 지도
-  const map = L.map('map', { zoomControl: true }).setView([35.0974, 128.8583], 13);
-
-  // 타일(VWorld)
-  L.tileLayer('https://xdworld.vworld.kr/2d/Base/service/{z}/{x}/{y}.png', {
-    maxZoom: 19,
-    attribution: '&copy; 국토지리정보원 / Vworld'
-  }).addTo(map);
-
-  // 현재 방위각(도)
-  let bearing = 0;
-
-  // Leaflet가 매 이동마다 mapPane의 translate를 갱신하므로,
-  // 우리가 원하는 회전값을 "항상" translate 뒤에 덧붙여준다.
-  const pane = map.getPanes().mapPane;
-  function applyRotation() {
-    const t = pane.style.transform || '';
-    // 기존 rotate(...) 제거
-    const tNoRotate = t.replace(/ rotate\([^)]*\)/, '');
-    pane.style.transform = tNoRotate + ` rotate(${bearing}deg)`;
-  }
-  // 이동/줌 등 transform이 갱신될 때마다 회전 다시 반영
-  map.on('move zoom moveend zoomend load', applyRotation);
-
-  function setBearing(deg){
-    bearing = ((deg % 360) + 360) % 360; // 0~359
-    applyRotation();
-    // 나침반 UI 갱신
-    if (northCtrl && northCtrl._needle) northCtrl._needle.style.transform = `rotate(${bearing}deg)`;
-    if (northCtrl && northCtrl._label ) northCtrl._label.textContent = `${bearing.toFixed(0)}°`;
-  }
-
-  // 내 위치(옵션)
-  if (navigator.geolocation) {
-    navigator.geolocation.getCurrentPosition(function(pos){
-      const lat = pos.coords.latitude, lon = pos.coords.longitude;
-      const m = L.marker([lat, lon], {icon: myLocationIcon}).addTo(map);
-      m.bindPopup("📍 내 위치").openPopup();
-      map.setView([lat, lon], 15);
+    // 2) 지도 생성 (부산 강서구 근처)
+    const map = new maplibregl.Map({
+      container: 'map',
+      style: vwStyle,
+      center: [128.8583, 35.0974],   // [lng, lat]
+      zoom: 13,
+      bearing: 0,                    // 회전각
+      pitch: 0,                      // 기울기
+      maxZoom: 19,
+      dragRotate: true,              // 한 손가락 드래그로 회전(데스크탑)
+      touchZoomRotate: true          // 모바일 두 손가락 비틀기 회전
     });
-  }
 
-  // (필요 시) CCTV 마커 예시
-  const cctvList = [
+    // 3) 내비게이션 컨트롤: 확대/축소 + 나침판(클릭 시 북쪽 복귀)
+    map.addControl(new maplibregl.NavigationControl({
+      visualizePitch: false, showCompass: true, showZoom: true
+    }), 'top-right');
+    // (참고) 이 기본 나침판은 각도 숫자를 표시하지 않음.
+
+    // 4) 내 위치 버튼 (기본 GeolocateControl + 커스텀 버튼 둘 다 제공)
+    const geo = new maplibregl.GeolocateControl({
+      positionOptions: { enableHighAccuracy: true },
+      trackUserLocation: true,
+      showUserLocation: true,
+      showAccuracyCircle: false,
+      showUserHeading: true          // 가능하면 진행방향 화살표 표시
+    });
+    map.addControl(geo, 'top-left');
+
+    // 커스텀 📍 버튼: 탭하면 현재 위치로 flyTo
+    document.getElementById('myloc').addEventListener('click', () => {
+      geo.trigger();                 // 권한 요청 및 위치 이동
+    });
+
+    // 5) 필요시 CCTV 마커(예시) — 나중에 배열 채워서 사용
+    const cctvList = [
 { name: "(1차)송정중학교(송정동1437-19)", lat: 35.105045 , lng:  128.842971 },
 { name: "(1차)명지1동주민센터앞(명지동1346)", lat: 35.107749 , lng:  128.926296 },
 { name: "(1차)대저1동_433-17_대상초등학교", lat: 35.215358 , lng:  128.980538 },
@@ -1918,76 +1917,16 @@
 { name: "천성)산6-92_지양곡_등산로입구_1", lat: 35.022714 , lng:  128.822455 },
 { name: "천성)산6-92_지양곡_등산로입구_2", lat: 35.022714 , lng:  128.822455 },
 { name: "천성)산6-92_지양곡_등산로입구_3", lat: 35.022714 , lng:  128.822455 }
+    ];
+    cctvList.forEach(p => {
+      new maplibregl.Marker().setLngLat([p.lng, p.lat]).setPopup(new maplibregl.Popup().setText("📹 " + p.name)).addTo(map);
+    });
 
-
-]; // [{name:'...', lat:.., lng:..}, ...]
-  cctvList.forEach(c => L.marker([c.lat, c.lng]).addTo(map).bindPopup("📹 " + c.name));
-
-  // 🧭 나침반(클릭 → 북쪽 복귀)
-  let northCtrl = null;
-  L.Control.North = L.Control.extend({
-    options: { position: 'topright' },
-    onAdd: function(){
-      const div = L.DomUtil.create('div', 'leaflet-control-north');
-      div.title = '클릭: 북쪽(0°)으로 복귀';
-      div.innerHTML = `
-        <svg class="north-svg" viewBox="0 0 48 48" aria-hidden="true">
-          <path d="M24 4 L31 22 L24 18 L17 22 Z" fill="crimson" stroke="#900" stroke-width="1"/>
-          <path d="M24 44 L17 26 L24 30 L31 26 Z" fill="#777" stroke="#555" stroke-width="1"/>
-          <circle cx="24" cy="24" r="22" fill="none" stroke="#aaa" stroke-width="1"/>
-          <text x="24" y="11" text-anchor="middle" font-size="9" fill="#222">N</text>
-        </svg>
-        <div class="north-deg" id="north-deg">N</div>`;
-      this._needle = div.querySelector('.north-svg');
-      this._label  = div.querySelector('#north-deg');
-      div.addEventListener('click', () => setBearing(0));
-      L.DomEvent.disableClickPropagation(div);
-      return div;
-    }
-  });
-  northCtrl = new L.Control.North().addTo(map);
-
-  // 👆 두 손가락 회전 제스처
-  const el = map.getContainer();
-  let rotating = false, startAngle = 0, startBearing = 0;
-
-  function angleBetween(t1, t2){
-    const dx = t2.clientX - t1.clientX;
-    const dy = t2.clientY - t1.clientY;
-    return Math.atan2(dy, dx) * 180 / Math.PI; // -180 ~ 180
-  }
-
-  function onTouchStart(e){
-    if (e.touches && e.touches.length === 2){
-      rotating = true;
-      startAngle = angleBetween(e.touches[0], e.touches[1]);
-      startBearing = bearing;
-      map.dragging.disable();   // 회전 중 드래그 방지
-      // 줌/스크롤 기본동작 간섭 줄이기
-      e.preventDefault();
-    }
-  }
-  function onTouchMove(e){
-    if (!rotating || !(e.touches && e.touches.length === 2)) return;
-    const ang = angleBetween(e.touches[0], e.touches[1]);
-    const delta = ang - startAngle;          // 회전 변화량(도)
-    setBearing(startBearing - delta);
-    e.preventDefault();
-  }
-  function onTouchEnd(e){
-    if (rotating && (!e.touches || e.touches.length < 2)){
-      rotating = false;
-      map.dragging.enable();
-    }
-  }
-  // passive:false 여야 preventDefault()가 동작
-  el.addEventListener('touchstart', onTouchStart, {passive:false});
-  el.addEventListener('touchmove',  onTouchMove,  {passive:false});
-  el.addEventListener('touchend',   onTouchEnd,   {passive:false});
-  el.addEventListener('touchcancel',onTouchEnd,   {passive:false});
-
-  // 시작은 북쪽 정렬
-  setBearing(0);
+    // 6) 초기 로딩 후 동작 보장
+    map.on('load', () => {
+      // 모바일: 두 손가락 비틀기 회전 기본 지원 (추가 설정 불필요)
+      // 나침판 클릭 시 자동으로 북쪽으로 복귀 (기본 동작)
+    });
   </script>
 </body>
 </html>
