@@ -1,54 +1,65 @@
 <!DOCTYPE html>
-
 <html>
 <head>
-<title>CCTV 위치 지도</title>
-<meta charset="utf-8"/>
-<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
-<!-- Leaflet 스타일 -->
-<link href="https://unpkg.com/leaflet/dist/leaflet.css" rel="stylesheet"/>
-<!-- Leaflet 스크립트 -->
-<script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
-<style>
+  <title>CCTV 위치 지도</title>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <!-- Leaflet 스타일 -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css"/>
+  <!-- Leaflet 스크립트 -->
+  <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+  <style>
     #map {
       height: 100vh;
       width: 100%;
     }
+    /* 북쪽 나침반 표시용 스타일 */
+    .leaflet-control-north {
+      background: rgba(255,255,255,0.9);
+      border: 1px solid #ccc;
+      border-radius: 8px;
+      padding: 6px 8px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+      text-align: center;
+    }
+    .north-svg { width: 30px; height: 30px; display:block; margin:auto; }
+    .north-deg { font-size: 11px; color:#222; }
   </style>
 </head>
 <body>
-<div id="map"></div>
-<script>
-var myLocationIcon = L.icon({
-    iconUrl: 'https://maps.google.com/mapfiles/ms/icons/red-dot.png',
-    iconSize: [32, 32],
-    iconAnchor: [16, 32],
-    popupAnchor: [0, -32]
-});
+  <div id="map"></div>
 
+  <script>
+  // 🔴 내 위치 아이콘
+  var myLocationIcon = L.icon({
+      iconUrl: 'https://maps.google.com/mapfiles/ms/icons/red-dot.png',
+      iconSize: [32, 32],
+      iconAnchor: [16, 32],
+      popupAnchor: [0, -32]
+  });
 
-    // 지도 초기화
-    var map = L.map('map').setView([35.0974, 128.8583], 13);
+  // 지도 초기화
+  var map = L.map('map').setView([35.0974, 128.8583], 13);
 
-    // 타일 레이어 추가 (오픈스트리트맵)
-    L.tileLayer('https://xdworld.vworld.kr/2d/Base/service/{z}/{x}/{y}.png', {
-  maxZoom: 19,
-  attribution: '&copy; 국토지리정보원 / Vworld'
-}).addTo(map);
+  // 타일 레이어 (VWorld)
+  L.tileLayer('https://xdworld.vworld.kr/2d/Base/service/{z}/{x}/{y}.png', {
+    maxZoom: 19,
+    attribution: '&copy; 국토지리정보원 / Vworld'
+  }).addTo(map);
 
-    // 내 위치 가져오기
-    if (navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition(function(position) {
-  var lat = position.coords.latitude;
-  var lon = position.coords.longitude;
-  myLocationMarker = L.marker([lat, lon], {icon: myLocationIcon}).addTo(map);
-  myLocationMarker.bindPopup("📍 내 위치").openPopup();
-  map.setView([lat, lon], 15);
-});
-    }
+  // 내 위치 가져오기
+  if (navigator.geolocation) {
+    navigator.geolocation.getCurrentPosition(function(position) {
+      var lat = position.coords.latitude;
+      var lon = position.coords.longitude;
+      myLocationMarker = L.marker([lat, lon], {icon: myLocationIcon}).addTo(map);
+      myLocationMarker.bindPopup("📍 내 위치").openPopup();
+      map.setView([lat, lon], 15);
+    });
+  }
 
-    // CCTV 데이터 마커 추가
-    var cctvList = [
+  // CCTV 데이터 (지금은 비워둠)
+  var cctvList = [
 { name: "(1차)송정중학교(송정동1437-19)", lat: 35.105045 , lng:  128.842971 },
 { name: "(1차)명지1동주민센터앞(명지동1346)", lat: 35.107749 , lng:  128.926296 },
 { name: "(1차)대저1동_433-17_대상초등학교", lat: 35.215358 , lng:  128.980538 },
@@ -1889,35 +1900,81 @@ var myLocationIcon = L.icon({
 { name: "천성)산6-92_지양곡_등산로입구_2", lat: 35.022714 , lng:  128.822455 },
 { name: "천성)산6-92_지양곡_등산로입구_3", lat: 35.022714 , lng:  128.822455 }
     ];
+  cctvList.forEach(function(cctv) {
+    var marker = L.marker([cctv.lat, cctv.lng]).addTo(map);
+    marker.bindPopup("📹 " + cctv.name);
+  });
 
-    cctvList.forEach(function(cctv) {
-      var marker = L.marker([cctv.lat, cctv.lng]).addTo(map);
-      marker.bindPopup("📹 " + cctv.name);
-    });
-  
+  // 📍 내 위치 버튼
+  var locateBtn = L.control({position: 'topleft'});
+  locateBtn.onAdd = function(map) {
+      var div = L.DomUtil.create('div', 'leaflet-bar leaflet-control leaflet-control-custom');
+      div.innerHTML = '<button title="내 위치 보기" style="width: 32px; height: 32px;">📍</button>';
+      div.style.backgroundColor = 'white';
+      div.style.cursor = 'pointer';
+      div.onclick = function(){
+          navigator.geolocation.getCurrentPosition(function(pos) {
+              var lat = pos.coords.latitude;
+              var lng = pos.coords.longitude;
+              if (typeof myLocationMarker !== 'undefined') {
+                  map.removeLayer(myLocationMarker);
+              }
+              myLocationMarker = L.marker([lat, lng], {icon: myLocationIcon}).addTo(map);
+              myLocationMarker.bindPopup("📍 내 위치").openPopup();
+              map.setView([lat, lng], 15);
+          });
+      };
+      return div;
+  };
+  locateBtn.addTo(map);
 
-// 내 위치 버튼 추가
-var locateBtn = L.control({position: 'topleft'});
-locateBtn.onAdd = function(map) {
-    var div = L.DomUtil.create('div', 'leaflet-bar leaflet-control leaflet-control-custom');
-    div.innerHTML = '<button title="내 위치 보기" style="width: 32px; height: 32px;">📍</button>';
-    div.style.backgroundColor = 'white';
-    div.style.cursor = 'pointer';
-    div.onclick = function(){
-        navigator.geolocation.getCurrentPosition(function(pos) {
-            var lat = pos.coords.latitude;
-            var lng = pos.coords.longitude;
-            if (typeof myLocationMarker !== 'undefined') {
-                map.removeLayer(myLocationMarker);
-            }
-            myLocationMarker = L.marker([lat, lng], {icon: myLocationIcon}).addTo(map);
-            myLocationMarker.bindPopup("📍 내 위치").openPopup();
-            map.setView([lat, lng], 15);
-        });
-    };
-    return div;
-};
-locateBtn.addTo(map);
-</script>
+  // 🧭 북쪽 나침반 컨트롤 추가
+  L.Control.North = L.Control.extend({
+    onAdd: function(map) {
+      const div = L.DomUtil.create('div', 'leaflet-control-north');
+      div.innerHTML = `
+        <svg class="north-svg" viewBox="0 0 48 48">
+          <path d="M24 4 L31 22 L24 18 L17 22 Z" fill="crimson" stroke="#900" stroke-width="1"/>
+          <path d="M24 44 L17 26 L24 30 L31 26 Z" fill="#777" stroke="#555" stroke-width="1"/>
+          <circle cx="24" cy="24" r="22" fill="none" stroke="#aaa" stroke-width="1"/>
+          <text x="24" y="11" text-anchor="middle" font-size="9" fill="#222">N</text>
+        </svg>
+        <div class="north-deg" id="north-deg">N</div>
+      `;
+      this._needle = div.querySelector('.north-svg');
+      this._label = div.querySelector('#north-deg');
+
+      // 기기 방향 센서 지원 시 회전
+      const self = this;
+      function handleOrient(e){
+        const heading = (typeof e.webkitCompassHeading === 'number')
+          ? e.webkitCompassHeading
+          : (typeof e.alpha === 'number' ? (360 - e.alpha) % 360 : null);
+        if (heading != null) {
+          self._needle.style.transform = `rotate(${heading}deg)`;
+          self._label.textContent = `${heading.toFixed(0)}°`;
+        }
+      }
+      if (window.DeviceOrientationEvent && typeof DeviceOrientationEvent.requestPermission === 'function') {
+        const askPermission = () => {
+          DeviceOrientationEvent.requestPermission().then(state => {
+            if (state === 'granted')
+              window.addEventListener('deviceorientation', handleOrient, true);
+          }).catch(()=>{});
+          map.getContainer().removeEventListener('click', askPermission);
+        };
+        map.getContainer().addEventListener('click', askPermission);
+      } else if (window.DeviceOrientationEvent) {
+        window.addEventListener('deviceorientationabsolute' in window ? 'deviceorientationabsolute' : 'deviceorientation', handleOrient, true);
+      }
+
+      return div;
+    },
+    onRemove: function(){}
+  });
+  L.control.north = function(opts){ return new L.Control.North(opts); };
+  L.control.north({ position: 'topright' }).addTo(map);
+
+  </script>
 </body>
 </html>
