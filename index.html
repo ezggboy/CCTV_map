@@ -5,23 +5,23 @@
   <title>CCTV 위치 지도</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no"/>
 
-  <!-- MapLibre GL (WebGL 지도: 회전/피치/라벨 동시 회전) -->
+  <!-- MapLibre GL: WebGL 지도 (자연스러운 회전/줌/피치) -->
   <link href="https://unpkg.com/maplibre-gl@3.6.2/dist/maplibre-gl.css" rel="stylesheet"/>
   <script src="https://unpkg.com/maplibre-gl@3.6.2/dist/maplibre-gl.js"></script>
 
   <style>
     html, body, #map { height:100%; width:100%; margin:0; }
 
-    /* 내 위치 아이콘을 파란색 → 빨간색으로 */
+    /* 내 위치 아이콘: 파랑 → 빨강 */
     .maplibregl-user-location-dot {
       background-color: red !important;            /* 중심 점 */
       border: 2px solid #fff !important;
     }
     .maplibregl-user-location-dot::before {
-      background-color: rgba(255,0,0,0.25) !important; /* 퍼지는 원 */
+      background-color: rgba(255, 0, 0, 0.25) !important; /* 퍼지는 원 */
     }
 
-    /* 커스텀 내 위치 버튼(기본 Geolocate도 함께 제공) */
+    /* 커스텀 "내 위치" 버튼 (기본 GeolocateControl도 함께 제공) */
     .myloc-btn{
       position:absolute; left:10px; top:110px; z-index:10;
       background:#fff; border:1px solid #ccc; border-radius:4px;
@@ -36,20 +36,16 @@
   <div id="myloc" class="myloc-btn" title="내 위치로 이동">📍</div>
 
   <script>
-    // ---- 1) VWorld 타일 스타일 ---------------------------------------------
-    // 벡터(라벨 회전 자연) 대신 '라벨 포함 래스터'를 사용해도 회전 시 글자가 함께 돌아갑니다.
-    // (키가 필요 없는 공개 래스터도 있으나, 아래는 요청하신 대로 인증키를 포함한 경로를 기본으로 둡니다)
+    // ===== 1) VWorld 스타일 정의 =====
+    // A안: 인증키 기반 래스터 타일(한글 라벨 포함). 지도를 회전하면 라벨도 함께 회전합니다.
     const VWORLD_KEY = "E7DF2AFD-F925-35F3-9EC4-1084B29E282E";
-
-    // 옵션 A) 인증키 기반 래스터 타일(라벨 포함)
     const vworldRasterStyle = {
       "version": 8,
       "sources": {
         "vworld-base": {
           "type": "raster",
           "tiles": [
-            // WMTS/TMS 형식의 기본지도 PNG 타일
-            // 일부 환경에서 접근 제약이 있으면 아래 '공개 래스터' 옵션 B로 교체하세요.
+            // WMTS/TMS PNG 타일 (키 필요)
             `https://api.vworld.kr/req/wmts/1.0.0/${VWORLD_KEY}/Base/{z}/{y}/{x}.png`
           ],
           "tileSize": 256,
@@ -61,7 +57,7 @@
       ]
     };
 
-    // 옵션 B) 공개 래스터(백업용) — 키 없이 사용 가능
+    // B안(백업): 공개 래스터 (키 불필요). 필요 시 위 스타일 대신 아래 스타일을 style로 넣어 사용.
     // const vworldRasterStyle = {
     //   "version": 8,
     //   "sources": {
@@ -75,39 +71,40 @@
     //   "layers": [{ "id": "vworld-base", "type": "raster", "source": "vworld-base" }]
     // };
 
-    // ---- 2) 지도 생성 --------------------------------------------------------
+    // (참고) 만약 VWorld "벡터 타일" 스타일 JSON을 쓰게 되면,
+    // 아래 load 이벤트의 심볼 레이어 패치가 적용되어 레이블도 지도 기준으로 회전합니다.
+
+    // ===== 2) 지도 생성 =====
     const map = new maplibregl.Map({
       container: 'map',
-      style: vworldRasterStyle,        // 위에서 선택한 스타일
-      center: [128.8583, 35.0974],     // [lng, lat] (강서구 근처)
+      style: vworldRasterStyle,          // 위에서 선택한 스타일 사용
+      center: [128.8583, 35.0974],       // [lng, lat] (강서구 근처)
       zoom: 13,
-      bearing: 0,                      // 회전 각도
-      pitch: 0,                        // 기울기
+      bearing: 0,                        // 회전 각도
+      pitch: 0,                          // 기울기
       maxZoom: 19,
-      dragRotate: true,                // 데스크톱: 마우스 드래그 회전
-      touchZoomRotate: true            // 모바일: 두 손가락 비틀기 회전
+      dragRotate: true,                  // 데스크톱: 드래그로 회전
+      touchZoomRotate: true              // 모바일: 두 손가락 비틀기 회전
     });
 
-    // ---- 3) 네비게이션 컨트롤(확대/축소 + 나침판) ----------------------------
-    // 나침판은 "숫자 각도 표시 없음", 클릭 시 자동으로 북쪽 복귀(기본 동작)
+    // ===== 3) 확대/축소 + 나침판 (각도 숫자 없음, 클릭 시 북쪽 복귀) =====
     map.addControl(new maplibregl.NavigationControl({
       visualizePitch: false, showCompass: true, showZoom: true
     }), 'top-right');
 
-    // ---- 4) 내 위치 컨트롤(+ 진행방향 화살표) -------------------------------
+    // ===== 4) 내 위치 컨트롤(진행방향 표시) + 커스텀 버튼 =====
     const geolocate = new maplibregl.GeolocateControl({
       positionOptions: { enableHighAccuracy: true },
       trackUserLocation: true,
       showUserLocation: true,
       showAccuracyCircle: false,
-      showUserHeading: true           // 가능하면 진행방향 표시
+      showUserHeading: true
     });
     map.addControl(geolocate, 'top-left');
 
-    // 커스텀 📍버튼 → geolocate 트리거(권한 요청 및 이동)
     document.getElementById('myloc').addEventListener('click', () => geolocate.trigger());
 
-    // ---- 5) CCTV 마커 (원하면 배열에 채워서 사용) ---------------------------
+    // ===== 5) CCTV 마커 (원하면 배열에 채워 사용) =====
     const cctvList = [
 { name: "(1차)송정중학교(송정동1437-19)", lat: 35.105045 , lng:  128.842971 },
 { name: "(1차)명지1동주민센터앞(명지동1346)", lat: 35.107749 , lng:  128.926296 },
@@ -1956,9 +1953,27 @@
         .addTo(map);
     });
 
-    // ---- 6) 초기 로드 후 보조 동작 ------------------------------------------
+    // ===== 6) 로드 후 레이어 속성 패치 =====
     map.on('load', () => {
-      // 기본적으로 두 손가락 회전·핀치 줌, 나침판 클릭 시 북쪽 복귀가 활성화되어 있습니다.
+      // (벡터 스타일을 쓸 때) 심볼 레이어 레이블도 '지도 기준'으로 회전하도록 보정
+      try {
+        const layers = (map.getStyle().layers || []);
+        layers
+          .filter(l => l.type === 'symbol')
+          .forEach(l => {
+            map.setLayoutProperty(l.id, 'text-rotation-alignment', 'map');
+            map.setLayoutProperty(l.id, 'icon-rotation-alignment', 'map');
+            map.setLayoutProperty(l.id, 'text-keep-upright', false);
+            map.setLayoutProperty(l.id, 'icon-keep-upright', false);
+            // 필요 시 겹침 허용
+            // map.setLayoutProperty(l.id, 'text-allow-overlap', true);
+          });
+      } catch(e) {
+        // 래스터 스타일이면 심볼 레이어가 없으므로 조용히 무시
+      }
+
+      // 모바일에서 두 손가락 회전이 확실히 켜지도록 보장
+      map.touchZoomRotate.enable();
     });
   </script>
 </body>
