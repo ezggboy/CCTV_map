@@ -2,28 +2,23 @@
 <html lang="ko">
 <head>
   <meta charset="utf-8"/>
-  <title>CCTV 위치 지도 (최종 버전)</title>
+  <title>CCTV 위치 지도</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no"/>
 
-  <!-- 📦 MapLibre GL (지도 라이브러리) -->
-  <link href="https://cdn.jsdelivr.net/npm/maplibre-gl@3.6.2/dist/maplibre-gl.css" rel="stylesheet"/>
-  <script src="https://cdn.jsdelivr.net/npm/maplibre-gl@3.6.2/dist/maplibre-gl.js"></script>
+  <!-- MapLibre GL -->
+  <link href="https://unpkg.com/maplibre-gl@3.6.2/dist/maplibre-gl.css" rel="stylesheet"/>
+  <script src="https://unpkg.com/maplibre-gl@3.6.2/dist/maplibre-gl.js"></script>
 
   <style>
-    /* 화면 전체를 지도에 할당 */
-    html, body, #map {
-      height: 100%;
-      width: 100%;
-      margin: 0;
-    }
+    html, body, #map { height:100%; width:100%; margin:0; }
 
-    /* 🔴 내 위치 점을 빨간색으로 변경 */
+    /* 🔴 내 위치 점을 빨강으로 표시 */
     .maplibregl-user-location-dot {
-      background: red !important;
+      background-color: red !important;
       border: 2px solid #fff !important;
     }
     .maplibregl-user-location-dot::before {
-      background: rgba(255,0,0,0.25) !important;
+      background-color: rgba(255, 0, 0, 0.25) !important;
     }
 
     /* 📋 범례 스타일 */
@@ -49,7 +44,7 @@
 
   <!-- 📋 CCTV 범례 -->
   <div class="legend">
-    <strong>CCTV 구분</strong>
+    <strong>📍 CCTV 구분</strong>
     <div class="legend-row"><span class="chip" style="background:#1976d2"></span> 방범</div>
     <div class="legend-row"><span class="chip" style="background:#d32f2f"></span> 재난</div>
     <div class="legend-row"><span class="chip" style="background:#2e7d32"></span> 청소</div>
@@ -58,11 +53,7 @@
   </div>
 
   <script>
-    /* ───────────────────────────────────────────────
-       ① VWORLD 지도 설정
-       - 국토지리정보원에서 제공하는 공공지도 API
-       - API KEY는 신청 후 발급받은 개인 키 사용
-    ─────────────────────────────────────────────── */
+    // ---- 1) VWorld 배경 지도 스타일 ----
     const VWORLD_KEY = "E7DF2AFD-F925-35F3-9EC4-1084B29E282E";
     const vworldRasterStyle = {
       "version": 8,
@@ -70,7 +61,7 @@
         "vworld-base": {
           "type": "raster",
           "tiles": [
-            "https://api.vworld.kr/req/wmts/1.0.0/" + VWORLD_KEY + "/Base/{z}/{y}/{x}.png"
+            `https://api.vworld.kr/req/wmts/1.0.0/${VWORLD_KEY}/Base/{z}/{y}/{x}.png`
           ],
           "tileSize": 256,
           "attribution": "© 국토지리정보원 / VWorld"
@@ -81,13 +72,8 @@
       ]
     };
 
-    /* ───────────────────────────────────────────────
-       ② 지도 초기화
-       - MapLibre를 이용해 지도 객체 생성
-       - 초기 중심 좌표는 강서구 (lat: 35.0974, lng: 128.8583)
-       - 확대/축소 및 회전 제스처 활성화
-    ─────────────────────────────────────────────── */
-       const map = new maplibregl.Map({
+    // ---- 2) 지도 생성 (모바일 회전/확대 가능) ----
+    const map = new maplibregl.Map({
       container: 'map',
       style: vworldRasterStyle,
       center: [128.8583, 35.0974],   // [lng, lat]
@@ -95,69 +81,37 @@
       bearing: 0,
       pitch: 0,
       maxZoom: 19,
-      dragRotate: true,              // 데스크톱 마우스 회전
-      touchZoomRotate: true          // 모바일 두 손가락 회전
+      dragRotate: true,              // 데스크탑 마우스 회전 허용
+      touchZoomRotate: true          // 모바일 두 손가락 회전 허용
     });
 
-
-    /* ───────────────────────────────────────────────
-       ③ 지도 기본 컨트롤 추가
-       - 오른쪽 상단: 나침반 + 확대/축소 버튼
-       - 왼쪽 상단: 내 위치 버튼
-    ─────────────────────────────────────────────── */
+    // 확대/축소 + 나침반 컨트롤
     map.addControl(new maplibregl.NavigationControl({
       showCompass: true,
-      showZoom: true
+      showZoom: true,
+      visualizePitch: false
     }), 'top-right');
 
+    // ---- 3) 내 위치 버튼 (빨간 점으로 표시됨) ----
     const geolocate = new maplibregl.GeolocateControl({
       positionOptions: { enableHighAccuracy: true },
-      trackUserLocation: true,   // 내 위치 자동 추적
-      showUserLocation: true,    // 내 위치 점 표시
-      showAccuracyCircle: false, // 반경 원 숨김
-      showUserHeading: true      // 방향 표시
+      trackUserLocation: true,
+      showUserLocation: true,
+      showAccuracyCircle: false,
+      showUserHeading: true
     });
     map.addControl(geolocate, 'top-left');
 
-    /* ───────────────────────────────────────────────
-       ④ CCTV 종류별 색상 설정
-       - 방범: 파랑, 재난: 빨강, 청소: 초록
-       - 산불: 주황, 비상벨: 보라
-    ─────────────────────────────────────────────── */
+    // ---- 4) CCTV 종류별 색상 설정 ----
     const TYPE_COLOR = {
-      "방범": "#1976d2",
-      "재난": "#d32f2f",
-      "청소": "#2e7d32",
-      "산불": "#fb8c00",
-      "비상벨": "#7e57c2"
+      "방범": "#1976d2",   // 파랑
+      "재난": "#d32f2f",   // 빨강
+      "청소": "#2e7d32",   // 초록
+      "산불": "#fb8c00",   // 주황
+      "비상벨": "#7e57c2"  // 보라
     };
 
-    /* ───────────────────────────────────────────────
-       ⑤ SVG 기반 물방울 아이콘 생성 함수
-       - 색상별로 커스텀 마커 생성
-       - SVG 사용으로 고해상도에서도 선명하게 표시
-    ─────────────────────────────────────────────── */
-    function makePinElement(color){
-      const wrap = document.createElement('div');
-      wrap.innerHTML = `
-        <svg viewBox="0 0 24 36" width="15" height="22.5" xmlns="http://www.w3.org/2000/svg">
-          <defs>
-            <filter id="ds" x="-50%" y="-50%" width="200%" height="200%">
-              <feDropShadow dx="0" dy="2" stdDeviation="1" flood-color="rgba(0,0,0,0.35)"/>
-            </filter>
-          </defs>
-          <path d="M12 0C5.4 0 0 5.1 0 11.5 0 20.2 12 36 12 36s12-15.8 12-24.5C24 5.1 18.6 0 12 0z"
-                fill="${color}" filter="url(#ds)"/>
-          <circle cx="12" cy="12" r="4" fill="#ffffff"/>
-        </svg>`;
-      return wrap.firstElementChild;
-    }
-
-    /* ───────────────────────────────────────────────
-       ⑥ CCTV 좌표 데이터 (예시)
-       - 실제 서비스에서는 DB 또는 API에서 불러올 수 있음
-       - 위경도(lat, lng)와 CCTV 유형(type) 포함
-    ─────────────────────────────────────────────── */
+    // ---- 5) 예시 CCTV 데이터 ----
     const cctvList = [
 
 { name: "[방범](1차)송정중학교(송정동1437-19)", lat: 35.105045, lng: 128.842971, type:"방범" },
@@ -2228,31 +2182,40 @@
 
     ];
 
-    /* ───────────────────────────────────────────────
-       ⑦ CCTV 마커 추가
-       - 각 CCTV 위치에 물방울 아이콘 추가
-       - 클릭 시 팝업으로 이름 및 유형 표시
-    ─────────────────────────────────────────────── */
+     // ---- 6) CCTV 마커 추가 ----
     cctvList.forEach(p => {
       const color = TYPE_COLOR[p.type] || "#607d8b";
-      new maplibregl.Marker({ element: makePinElement(color), anchor:"bottom" })
+      // SVG 물방울 마커 생성
+      const el = document.createElement('div');
+      el.innerHTML = `
+        <svg viewBox="0 0 24 36" width="15" height="22.5" xmlns="http://www.w3.org/2000/svg">
+          <defs>
+            <filter id="ds" x="-50%" y="-50%" width="200%" height="200%">
+              <feDropShadow dx="0" dy="2" stdDeviation="1" flood-color="rgba(0,0,0,0.35)"/>
+            </filter>
+          </defs>
+          <path d="M12 0C5.4 0 0 5.1 0 11.5 0 20.2 12 36 12 36s12-15.8 12-24.5C24 5.1 18.6 0 12 0z"
+                fill="${color}" filter="url(#ds)"/>
+          <circle cx="12" cy="12" r="4" fill="#ffffff"/>
+        </svg>
+      `;
+
+      new maplibregl.Marker({ element: el.firstElementChild, anchor: "bottom" })
         .setLngLat([p.lng, p.lat])
-        .setPopup(new maplibregl.Popup().setHTML(
-          `<div style="text-align:center"><strong>${p.name}</strong><br>
-           <span style="color:${color};font-weight:600">${p.type}</span></div>`
-        ))
+        .setPopup(new maplibregl.Popup().setHTML(`
+          <div style="text-align:center">
+            <strong>${p.name}</strong><br>
+            <span style="color:${color};font-weight:600">${p.type}</span>
+          </div>
+        `))
         .addTo(map);
     });
 
-    /* ───────────────────────────────────────────────
-       ⑧ 지도 로드 후 동작
-       - 모바일 회전 제스처 허용
-       - HTTPS 환경에서 자동으로 내 위치 요청
-    ─────────────────────────────────────────────── */
+    // ---- 7) 지도 로드 후 설정 ----
     map.on('load', () => {
-      map.touchZoomRotate.enable();  // 손가락 회전 허용
+      map.touchZoomRotate.enable();  // 모바일 회전/확대 허용
       if (location.protocol === 'https:' || location.hostname === 'localhost') {
-        geolocate.trigger();         // HTTPS일 경우 내 위치 자동 표시
+        geolocate.trigger();         // HTTPS 환경일 때 자동 내 위치 표시
       } else {
         console.warn("⚠️ 위치 기능은 HTTPS 환경에서만 작동합니다.");
       }
@@ -2260,3 +2223,4 @@
   </script>
 </body>
 </html>
+
