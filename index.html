@@ -49,7 +49,7 @@
 
   <!-- 📋 CCTV 범례 -->
   <div class="legend">
-    <strong>📍 CCTV 구분</strong>
+    <strong>CCTV 구분</strong>
     <div class="legend-row"><span class="chip" style="background:#1976d2"></span> 방범</div>
     <div class="legend-row"><span class="chip" style="background:#d32f2f"></span> 재난</div>
     <div class="legend-row"><span class="chip" style="background:#2e7d32"></span> 청소</div>
@@ -87,15 +87,18 @@
        - 초기 중심 좌표는 강서구 (lat: 35.0974, lng: 128.8583)
        - 확대/축소 및 회전 제스처 활성화
     ─────────────────────────────────────────────── */
-    const map = new maplibregl.Map({
+       const map = new maplibregl.Map({
       container: 'map',
       style: vworldRasterStyle,
-      center: [128.8583, 35.0974],
-      zoom: 12,             // 초기 줌 레벨 (낮을수록 넓게 보임)
-      maxZoom: 18,          // 최대 확대 제한
-      dragRotate: true,     // 데스크탑에서 마우스로 회전 가능
-      touchZoomRotate: true // 모바일에서 손가락 두 개로 회전 가능
+      center: [128.8583, 35.0974],   // [lng, lat]
+      zoom: 13,
+      bearing: 0,
+      pitch: 0,
+      maxZoom: 19,
+      dragRotate: true,              // 데스크톱 마우스 회전
+      touchZoomRotate: true          // 모바일 두 손가락 회전
     });
+
 
     /* ───────────────────────────────────────────────
        ③ 지도 기본 컨트롤 추가
