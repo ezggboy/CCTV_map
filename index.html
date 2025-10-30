@@ -2,14 +2,14 @@
 <html lang="ko">
 <head>
   <meta charset="utf-8"/>
-  <title>CCTV 위치 지도</title>
+  <title>CCTV 위치 지도 (최적화 버전)</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no"/>
   <!-- MapLibre GL -->
-  <link href="https://unpkg.com/maplibre-gl@3.6.2/dist/maplibre-gl.css" rel="stylesheet"/>
-  <script src="https://unpkg.com/maplibre-gl@3.6.2/dist/maplibre-gl.js"></script>
+  <link href="https://cdn.jsdelivr.net/npm/maplibre-gl@3.6.2/dist/maplibre-gl.css" rel="stylesheet"/>
+  <script src="https://cdn.jsdelivr.net/npm/maplibre-gl@3.6.2/dist/maplibre-gl.js"></script>
   <style>
     html, body, #map { height:100%; width:100%; margin:0; }
-    /* 내 위치 점 빨강 */
+    /* 내 위치 점(빨강) */
     .maplibregl-user-location-dot {
       background: red !important;
       border: 2px solid #fff !important;
@@ -33,16 +33,17 @@
 
   <!-- 범례 -->
   <div class="legend">
-    <strong>CCTV 구분</strong>
+    <strong>📍 CCTV 구분</strong>
     <div class="legend-row"><span class="chip" style="background:#1976d2"></span> 방범</div>
     <div class="legend-row"><span class="chip" style="background:#d32f2f"></span> 재난</div>
     <div class="legend-row"><span class="chip" style="background:#2e7d32"></span> 청소</div>
+    <div class="legend-row"><span class="chip" style="background:#f6c026"></span> 초등</div>
     <div class="legend-row"><span class="chip" style="background:#fb8c00"></span> 산불</div>
     <div class="legend-row"><span class="chip" style="background:#7e57c2"></span> 비상벨</div>
   </div>
 
   <script>
-    // ---- 1) VWORLD 지도 스타일 ----
+    // 🔹 1) VWORLD 지도 스타일 (경량화)
     const VWORLD_KEY = "E7DF2AFD-F925-35F3-9EC4-1084B29E282E";
     const vworldRasterStyle = {
       "version": 8,
@@ -59,23 +60,22 @@
       "layers": [{ "id": "vworld-base", "type": "raster", "source": "vworld-base" }]
     };
 
-    // ---- 2) 지도 생성 ----
+    // 🔹 2) 지도 생성 (성능 최적화)
     const map = new maplibregl.Map({
       container: 'map',
       style: vworldRasterStyle,
       center: [128.8583, 35.0974],
-      zoom: 13,
-      bearing: 0,
-      pitch: 0,
-      maxZoom: 19,
-      dragRotate: true,
-      touchZoomRotate: true
+      zoom: 12,            // 초기 줌 축소 → 로딩 속도 개선
+      maxZoom: 18,         // 너무 깊은 확대 방지
+      dragRotate: false,   // 회전 기능 끄기 → 렌더링 부하 감소
+      touchZoomRotate: false
     });
 
     map.addControl(new maplibregl.NavigationControl({
-      showCompass: true, showZoom: true, visualizePitch: false
+      showCompass: true, showZoom: true
     }), 'top-right');
 
+    // 🔹 3) 내 위치 컨트롤 (HTTPS에서만 자동 실행)
     const geolocate = new maplibregl.GeolocateControl({
       positionOptions: { enableHighAccuracy: true },
       trackUserLocation: true,
@@ -85,16 +85,17 @@
     });
     map.addControl(geolocate, 'top-left');
 
-    // ---- 3) CCTV 종류별 색상 ----
+    // 🔹 4) CCTV 색상 설정
     const TYPE_COLOR = {
-      "방범": "#1976d2",   // 파랑
-      "재난": "#d32f2f",   // 빨강
-      "청소": "#2e7d32",   // 초록
-      "산불": "#fb8c00",   // 주황
-      "비상벨": "#7e57c2"  // 보라
+      "방범": "#1976d2",
+      "재난": "#d32f2f",
+      "청소": "#2e7d32",
+      "초등": "#f6c026",
+      "산불": "#fb8c00",
+      "비상벨": "#7e57c2"
     };
 
-    // ---- 4) 물방울 핀(50% 축소) ----
+    // 🔹 5) 물방울 마커 (50% 축소)
     function makePinElement(color){
       const wrap = document.createElement('div');
       wrap.innerHTML = `
@@ -110,7 +111,6 @@
         </svg>`;
       return wrap.firstElementChild;
     }
-
     // ---- 5) CCTV 데이터 (여기에 실제 데이터 넣기) ----
     const cctvList = [
 
@@ -2182,7 +2182,7 @@
 
     ];
 
-    // ---- 6) 중복 포함하여 그대로 표시 ----
+  // 🔹 7) CCTV 마커 표시
     cctvList.forEach(p => {
       const color = TYPE_COLOR[p.type] || "#607d8b";
       new maplibregl.Marker({ element: makePinElement(color), anchor:"bottom" })
@@ -2194,7 +2194,14 @@
         .addTo(map);
     });
 
-    map.on('load', () => map.touchZoomRotate.enable());
+    // 🔹 8) HTTPS 환경에서만 위치 자동 요청
+    map.on('load', () => {
+      if (location.protocol === 'https:' || location.hostname === 'localhost') {
+        geolocate.trigger();   // 내 위치 자동 요청
+      } else {
+        console.warn("⚠️ 위치 기능은 HTTPS 환경에서만 작동합니다.");
+      }
+    });
   </script>
 </body>
 </html>
